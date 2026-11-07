@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KYC Screening</title>
+<style>
+:root { --surface:#fcfcfb; --panel:#f3f2ef; --ink:#0b0b0b; --ink2:#52514e; --line:#e4e3df; --accent:#2a78d6;
+  --bad:#c9312f; --warn:#b26b00; --ok:#1d7f3a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --surface:#1a1a19; --panel:#242423; --ink:#f0efec; --ink2:#c3c2b7; --line:#3a3936; --accent:#3987e5;
+  --bad:#e66767; --warn:#e0a030; --ok:#4cc06a; } }
+:root[data-theme="dark"] { --surface:#1a1a19; --panel:#242423; --ink:#f0efec; --ink2:#c3c2b7; --line:#3a3936;
+  --accent:#3987e5; --bad:#e66767; --warn:#e0a030; --ok:#4cc06a; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--surface); color:var(--ink); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { max-width:980px; margin:0 auto; padding:20px 16px 48px; }
+h1 { font-size:21px; margin:0; } .sub { color:var(--ink2); margin:2px 0 16px; }
+nav { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+nav button { background:var(--panel); color:var(--ink); border:1px solid var(--line); padding:6px 14px; border-radius:6px; cursor:pointer; }
+nav button.on { border-color:var(--accent); color:var(--accent); }
+form { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+input, select { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:7px 10px; font:inherit; }
+input[name=name] { flex:1 1 240px; }
+button.go { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 16px; font:inherit; cursor:pointer; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+.row { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.score { font-weight:600; font-variant-numeric:tabular-nums; }
+.tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); color:var(--ink2); margin-left:6px; }
+.tag.alert { border-color:var(--bad); color:var(--bad); }
+.tag.high { border-color:var(--bad); color:var(--bad); } .tag.medium { border-color:var(--warn); color:var(--warn); } .tag.low { border-color:var(--ok); color:var(--ok); }
+.bars { margin-top:8px; display:grid; grid-template-columns:110px 1fr 56px; gap:4px 10px; align-items:center; font-size:13px; color:var(--ink2); }
+.bar { height:8px; background:var(--line); border-radius:4px; position:relative; overflow:hidden; }
+.bar i { position:absolute; top:0; bottom:0; border-radius:4px; }
+.bar i.pos { left:0; background:var(--accent); } .bar i.neg { right:0; background:var(--bad); }
+.align { font-size:12px; color:var(--ink2); margin-top:6px; }
+.muted { color:var(--ink2); font-size:13px; }
+ul.ex { margin:6px 0 0; padding-left:18px; font-size:14px; }
+.og { width:100%; height:auto; max-height:560px; }
+.og rect { fill:var(--surface); stroke:var(--line); stroke-width:1.5; }
+.og .target rect { stroke:var(--ink); stroke-width:2; }
+.og .ubo rect { stroke:var(--accent); stroke-width:2.5; }
+.og .hit rect { stroke:var(--bad); stroke-width:3; }
+.og text.nm { fill:var(--ink); font-size:12px; font-weight:600; } .og text.sub { fill:var(--ink2); font-size:11px; }
+.og text.pct { fill:var(--ink2); font-size:11px; }
+.og .edge { fill:none; stroke:var(--ink2); stroke-width:1.2; opacity:.6; }
+.og .edge.hot { stroke:var(--accent); stroke-width:2.5; opacity:1; }
+.og .edge.cyc { stroke:var(--warn); stroke-dasharray:5 4; opacity:1; }
+iframe { width:100%; height:1500px; border:0; background:var(--surface); }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<main>
+<h1>KYC screening</h1>
+<p class="sub">Sanctions and PEP name screening, beneficial ownership, and risk rating. All names are fictional.</p>
+<nav>
+  <button data-tab="screen" class="on">Screen a name</button>
+  <button data-tab="business">Business ownership</button>
+  <button data-tab="tradeoff">Threshold tradeoff</button>
+</nav>
+
+<section id="screen">
+  <form id="f-screen">
+    <input name="name" placeholder="Name, e.g. Dr. Mohamed Al-Haddad" value="Sheikh Mohamed Haddad" required>
+    <select name="kind"><option value="person">person</option><option value="entity">entity</option></select>
+    <input name="dob" placeholder="DOB YYYY-MM-DD" size="13">
+    <input name="nationality" placeholder="Nat. (ISO 2)" size="10">
+    <button class="go">Screen</button>
+  </form>
+  <div id="screen-out"></div>
+</section>
+
+<section id="business" class="hidden">
+  <form id="f-biz"><select name="registry_id" id="biz-list"></select><button class="go">Analyze</button></form>
+  <div id="biz-out"></div>
+</section>
+
+<section id="tradeoff" class="hidden">
+  <iframe src="/report" title="Threshold tradeoff report"></iframe>
+</section>
+</main>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("hidden", s.id !== b.dataset.tab));
+});
+
+function bars(contribs) {
+  return `<div class="bars">${contribs.map(c => {
+    const w = Math.min(100, Math.abs(c.points) / 85 * 100);
+    return `<span>${esc(c.feature)} <span class="muted">${esc(typeof c.value === "number" ? c.value.toFixed(2) : c.value)}</span></span>
+      <div class="bar"><i class="${c.points >= 0 ? "pos" : "neg"}" style="width:${w}%"></i></div>
+      <span class="score">${c.points >= 0 ? "+" : ""}${c.points.toFixed(1)}</span>`;
+  }).join("")}</div>`;
+}
+
+function alignment(c) {
+  const d = c.contributions[0].detail || {};
+  if (!d.alignment) return "";
+  return `<div class="align">aligned: ${d.alignment.map(a => `${esc(a.query)} &rarr; ${esc(a.record ?? "none")} (${a.rule}, ${a.sim})`).join(", ")}
+    &middot; token set ${d.token_set}, joined ${d.joined}</div>`;
+}
+
+$("#f-screen").onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = Object.fromEntries([...f].filter(([, v]) => v));
+  const r = await fetch("/screen/name", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
+  const res = await r.json();
+  if (!r.ok) { $("#screen-out").innerHTML = `<div class="card">${esc(JSON.stringify(res.detail))}</div>`; return; }
+  $("#screen-out").innerHTML = `<p class="muted">Normalized: <b>${esc(res.normalized.join(" "))}</b>. Alert threshold ${res.threshold}. ${res.candidates.length} candidates above the floor.</p>` +
+    res.candidates.map(c => `<div class="card"><div class="row"><div><b>${esc(c.primary_name)}</b>
+      <span class="tag">${esc(c.list_type)}</span>${c.alert ? '<span class="tag alert">alert</span>' : ""}
+      <div class="muted">${esc(c.entry_id)} &middot; matched ${c.matched_alias ? "alias" : "primary name"} "${esc(c.matched_name)}" &middot; DOB ${esc(c.dob || "unknown")} &middot; ${esc(c.nationality || "nationality unknown")}</div></div>
+      <div class="score">${c.score.toFixed(1)}</div></div>${bars(c.contributions)}${alignment(c)}</div>`).join("");
+};
+
+async function loadRegistry() {
+  const list = await (await fetch("/api/registry?limit=12")).json();
+  $("#biz-list").innerHTML = list.map(c => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(c.country)})</option>`).join("");
+}
+
+$("#f-biz").onsubmit = async e => {
+  e.preventDefault();
+  const id = $("#biz-list").value;
+  const res = await (await fetch("/screen/business", {method: "POST", headers: {"content-type": "application/json"},
+    body: JSON.stringify({registry_id: id})})).json();
+  const svg = await (await fetch(`/api/business/${encodeURIComponent(id)}/graph.svg`)).text();
+  const ubos = res.ubos.map(u => `<li><b>${esc(u.name)}</b> ${u.basis === "ownership" ? u.effective_pct.toFixed(2) + "%" : "(senior managing official)"}
+    <ul class="ex">${(u.paths || []).map(p => `<li class="muted">${esc(p.explanation)}</li>`).join("")}</ul></li>`).join("");
+  const reasons = res.risk.reasons.map(r => `<li>${esc(r.reason)} <span class="muted">+${r.points}</span></li>`).join("");
+  $("#biz-out").innerHTML = `<div class="card"><div class="row"><div><b>${esc(res.company.name)}</b> <span class="muted">${esc(res.company.id)}, ${esc(res.company.country)}</span></div>
+    <div>risk <span class="tag ${res.risk.rating}">${res.risk.rating}</span> <span class="muted">${res.risk.points} points${res.risk.overrides.length ? ", override: " + esc(res.risk.overrides.join(", ")) : ""}</span></div></div>
+    ${svg}<p class="muted">Blue outline and edges: UBO and the paths that make them one. Red outline: screening hit. Dashed: circular holding.</p></div>
+    <div class="card"><b>Ultimate beneficial owners</b><ul class="ex">${ubos}</ul></div>
+    <div class="card"><b>Findings</b><ul class="ex">${res.explanation.map(x => `<li>${esc(x)}</li>`).join("") || "<li>none</li>"}</ul></div>
+    <div class="card"><b>Risk scorecard</b><ul class="ex">${reasons || "<li>no risk factors</li>"}</ul></div>`;
+};
+
+loadRegistry();
+$("#f-screen").requestSubmit();
+</script>
+</body>
+</html>

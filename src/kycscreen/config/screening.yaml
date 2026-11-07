@@ -1,0 +1,5 @@
+# Alert threshold for name screening, chosen from the eval tradeoff curve.
+# CI fails if recall at this threshold drops below target_recall.
+threshold: 71.5
+target_recall: 0.99
+candidate_floor: 30

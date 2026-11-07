@@ -1,0 +1,44 @@
+# Customer risk scorecard. Points add up; the total maps to a band.
+# Country lists are illustrative for the demo, not a regulatory list.
+bands:
+  medium: 25
+  high: 50
+
+customer_type:
+  individual: 0
+  sole_trader: 5
+  company: 10
+  trust: 20
+  foundation: 25
+
+geography:
+  high: { points: 30, countries: [IR, KP, MM, SY, YE] }
+  elevated: { points: 15, countries: [PA, VG, KY, SC, AE, CY, LB, IQ, LY, VE] }
+
+product:
+  savings: 0
+  card: 5
+  payments: 10
+  business_account: 10
+  cross_border_wire: 20
+  crypto_onramp: 25
+
+screening:
+  pep_hit: 25
+  sanctions_possible_match: 35
+  adverse_open_alert: 10
+
+ownership:
+  circular_ownership: 15
+  nominee_director: 15
+  nominee_shareholder: 15
+  mass_registration_address: 10
+  opaque_holder: 20
+  threshold_splitting: 20
+  layered_structure: 10
+  multi_jurisdiction: 5
+
+# Any of these forces the high band, whatever the points.
+overrides:
+  - sanctions_possible_match
+  - geography_high
